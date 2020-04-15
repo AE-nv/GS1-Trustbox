@@ -24,13 +24,28 @@ from nltk.corpus import stopwords
 import mlflow.sklearn
 import time
 
+from google.cloud import storage
+
 start_time = time.time()
 
 with mlflow.start_run():
     # Read the data data
     # ---------------------------------------------------------------------------------------------------
-    path = os.getcwd() + '/data/recp_Complete_TB_download_in_Excel_1462/'
-    all_files = glob.glob(path + "/*.xlsx")
+    if len(sys.argv) > 3:
+        bucket_name = sys.argv[3]
+        path = bucket_name + '/data/recp_Complete_TB_download_in_Excel_1462/'
+        storage_client = storage.Client()
+        bucket = storage_client.bucket(bucket_name)
+        blobs = bucket.list_blobs()
+        for blob in blobs:
+            print('Blobs: {}'.format(blob.name))
+            destination_uri = '{}/{}'.format(os.getcwd(), blob.name)
+            blob.download_to_filename(destination_uri)
+        path = os.getcwd() + '/data/recp_Complete_TB_download_in_Excel_1462/'
+        all_files = glob.glob(path + "/*.xlsx")
+    else:
+        path = os.getcwd() + '/data/recp_Complete_TB_download_in_Excel_1462/'
+        all_files = glob.glob(path + "/*.xlsx")
     all_files.sort()
 
     excel_list = []
