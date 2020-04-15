@@ -3,6 +3,7 @@
 
 # Packages
 import sys
+from pathlib import Path
 
 import pandas as pd
 import numpy as np
@@ -40,6 +41,9 @@ with mlflow.start_run():
         for blob in blobs:
             print('Blobs: {}'.format(blob.name))
             destination_uri = '{}/{}'.format(os.getcwd(), blob.name)
+            os_path_dir_name = "/".join(destination_uri.split("/")[:-1])
+            if not os.path.exists(os_path_dir_name):
+                Path(os_path_dir_name).mkdir(parents=True, exist_ok=True)
             blob.download_to_filename(destination_uri)
         path = os.getcwd() + '/data/recp_Complete_TB_download_in_Excel_1462/'
         all_files = glob.glob(path + "/*.xlsx")
