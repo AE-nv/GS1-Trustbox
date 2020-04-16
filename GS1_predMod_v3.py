@@ -74,7 +74,7 @@ with mlflow.start_run():
 
     if len(sys.argv) > 4:
         n_cpus = sys.argv[4]
-    else
+    else:
         n_cpus=1
 
     with Pool(processes=n_cpus) as pool:
