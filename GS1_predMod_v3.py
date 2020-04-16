@@ -10,6 +10,10 @@ import numpy as np
 import glob
 import os
 
+# Parallelization
+from multiprocessing import Pool
+
+
 # predictive model
 
 import re
@@ -27,11 +31,18 @@ import time
 
 from google.cloud import storage
 
+
+# Util function
+def read_xls(filename):
+    return pd.read_excel(filename, index_col=None, header=list(range(1, 7)), dtype=str)
+
 start_time = time.time()
 
 with mlflow.start_run():
     # Read the data data
     # ---------------------------------------------------------------------------------------------------
+    step_start_time = time.time()
+
     if len(sys.argv) > 3:
         bucket_name = sys.argv[3]
         path = bucket_name + '/data/recp_Complete_TB_download_in_Excel_1462/'
@@ -52,23 +63,32 @@ with mlflow.start_run():
         all_files = glob.glob(path + "/*.xlsx")
     all_files.sort()
 
+    mlflow.log_metric('File Read Time', time.time() - step_start_time)
+    step_start_time = time.time()
+
     excel_list = []
 
     mlflow.set_tag('data_type', 'files')
     for num, file in enumerate(all_files, start=0):
         mlflow.set_tag('data_file_' + str(num), file)
 
-    for filename in all_files:
-        one_excel = pd.read_excel(filename, index_col=None, header=list(range(1, 7)), dtype=str)
-        excel_list.append(one_excel)
+    if len(sys.argv) > 4:
+        n_cpus = sys.argv[4]
+    else
+        n_cpus=1
 
-    raw_start_df = pd.concat(excel_list, axis=0, ignore_index=True)
+    with Pool(processes=n_cpus) as pool:
+        all_excel_df = pool.map(read_xls, all_files)
+        raw_start_df = pd.concat(all_excel_df, axis=0, ignore_index=True)
 
     raw_header_lines = pd.read_excel(
         os.getcwd() + '/data/recp_Complete_TB_download_in_Excel_1462/recp_Complete_TB_download_in_Excel_14620.xlsx'
         , header=None
         , sheet_name='Sheet0'
         , nrows=7)
+
+    mlflow.log_metric('Concat Time', time.time() - step_start_time)
+    step_start_time = time.time()
 
     # create headers
     raw_header_lines.replace('empty|HEADER', np.nan, regex=True, inplace=True)
@@ -113,11 +133,17 @@ with mlflow.start_run():
     # create allergen dummies
     allergens_dummies = allergen_data['allergenTypeCode'].str.get_dummies()
 
+    mlflow.log_metric('Subset and headers Time', time.time() - step_start_time)
+    step_start_time = time.time()
+
     # merge everything
     data_f = pd.concat([allergen_data['gtin'],
                         pivot_prodName_subset,
                         pivot_ingrStat_subset,
                         allergens_dummies], axis=1)
+
+    mlflow.log_metric('Merge Time', time.time() - step_start_time)
+    step_start_time = time.time()
 
     # fill nan
     data_f['en.prodName'] = data_f.groupby('gtin')['en.prodName'].apply(lambda x: x.ffill().bfill())
@@ -129,6 +155,9 @@ with mlflow.start_run():
     data_f['nl.ingrStat'] = data_f.groupby('gtin')['nl.ingrStat'].apply(lambda x: x.ffill().bfill())
     data_f['fr.ingrStat'] = data_f.groupby('gtin')['fr.ingrStat'].apply(lambda x: x.ffill().bfill())
     data_f['de.ingrStat'] = data_f.groupby('gtin')['de.ingrStat'].apply(lambda x: x.ffill().bfill())
+
+    mlflow.log_metric('Nan Time', time.time() - step_start_time)
+    step_start_time = time.time()
 
     # data_f[['en.prodName', 'nl.prodName', 'fr.prodName', 'de.prodName']] = data_f[['en.prodName', 'nl.prodName',
     #     'fr.prodName', 'de.prodName']].fillna('Not Available')
@@ -142,6 +171,9 @@ with mlflow.start_run():
     aggregated_allergen_indicators = data_f.groupby('gtin')[allergen_indicator_cols].sum()
     aggregated_allergen_booleans = aggregated_allergen_indicators >= 1
     aggregated_data = pd.concat([aggregated_per_product, aggregated_allergen_booleans['AM']], axis=1)
+
+    mlflow.log_metric('Agg Time', time.time() - step_start_time)
+    step_start_time = time.time()
 
     # Predictive Model -------------------------------------------------------------
 
@@ -187,22 +219,31 @@ with mlflow.start_run():
     print(X_train.shape, y_train.shape)
     print(X_test.shape, y_test.shape)
 
+    mlflow.log_metric('Prep prediction Time', time.time() - step_start_time)
+    step_start_time = time.time()
+
     n_jobs = int(sys.argv[1]) if len(sys.argv) > 1 else 2
     random_state = int(sys.argv[2]) if len(sys.argv) > 2 else 0
 
     mlflow.log_param('n_jobs', n_jobs)
     mlflow.log_param('random_state', random_state)
 
+    step_start_time = time.time()
     # train RF
     clf = RandomForestClassifier(n_jobs=n_jobs, random_state=random_state)
     clf.fit(X_train, y_train)
+    mlflow.log_metric('Train Time', time.time() - step_start_time)
 
     # test performance
     predictions = clf.predict(X_test)
     X_test['model_prediction'] = predictions
+    mlflow.log_metric('Perf Time', time.time() - step_start_time)
+    step_start_time = time.time()
 
     # AUC
     fpr, tpr, thresholds = metrics.roc_curve(y_true=y_test, y_score=predictions, pos_label=1)
+    mlflow.log_metric('AUC Time', time.time() - step_start_time)
+    step_start_time = time.time()
     mlflow.log_metric('AUC', metrics.auc(fpr, tpr))
     mlflow.sklearn.log_model(clf, 'model')
     mlflow.log_metric('Exec Time', time.time() - start_time)

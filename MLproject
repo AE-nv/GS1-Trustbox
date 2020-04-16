@@ -8,4 +8,5 @@ entry_points:
       n_jobs: {type: int, default: 2}
       random_state: {type: int, default: 42}
       bucket: {type: string, default: ''}
-    command: "python GS1_predMod_v3.py {n_jobs} {random_state} {bucket}"
+      n_cpus: {type: int, default: 1}
+    command: "python GS1_predMod_v3.py {n_jobs} {random_state} {bucket} {n_cpus}"
