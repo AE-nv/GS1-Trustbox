@@ -73,7 +73,7 @@ with mlflow.start_run():
         mlflow.set_tag('data_file_' + str(num), file)
 
     if len(sys.argv) > 4:
-        n_cpus = sys.argv[4]
+        n_cpus = int(sys.argv[4])
     else:
         n_cpus=1
 
