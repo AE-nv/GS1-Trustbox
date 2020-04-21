@@ -182,7 +182,7 @@ def run(n_jobs, random_state, bucket_name, n_cpus):
         ps = PorterStemmer()
 
         nltk.download('stopwords')
-        stopwords = set(stopwords.words('english'))
+        stop_words = set(stopwords.words('english'))
         nltk.download('punkt')
 
         # remove products with no IngrStat
@@ -196,7 +196,7 @@ def run(n_jobs, random_state, bucket_name, n_cpus):
             lowerIngrList = lowerIngrList.split(' ')
             tmplist = []
             for ingredient in lowerIngrList:
-                if ingredient not in stopwords:
+                if ingredient not in stop_words:
                     tmplist.append(ingredient)
             tmplist2 = []
             for ingredient in tmplist:
