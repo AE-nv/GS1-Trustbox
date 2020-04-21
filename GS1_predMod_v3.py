@@ -244,7 +244,7 @@ def run(n_jobs, random_state, bucket_name, n_cpus):
         mlflow.log_metric('AUC Time', time.time() - step_start_time)
         step_start_time = time.time()
         mlflow.log_metric('AUC', metrics.auc(fpr, tpr))
-        mlflow.sklearn.log_model(clf, 'model')
+        mlflow.sklearn.log_model(clf, 'model', 'gs1-trustbox')
         mlflow.log_metric('Exec Time', time.time() - start_time)
 
 if __name__ == '__main__':
